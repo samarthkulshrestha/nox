@@ -12,6 +12,8 @@ $ cargo run
 
 the main idea is being able to define transformation rules of symbolic algebraic expressions and sequentially applying them:
 
+#### transforming the derivative of the square function
+
 ```
 square_of_sum : (x + y)^2 = x^2 + 2*x*y + y^2;
 der_def       : der(f) = lim(dx, 0, (f(x + dx) - f(x)) / dx);
