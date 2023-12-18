@@ -10,35 +10,41 @@ enum Expr {
 }
 
 impl Expr {
-    fn parse_peekable(lexer: &mut Peekable<impl Iterator<Item=Token>>) -> Self {
+    fn parse_peekable(lexer: &mut Peekable<impl Iterator<Item=Token>>) -> Result<Self, Error> {
         if let Some(name) = lexer.next() {
             match name.kind {
                 TokenKind::Sym => {
                     if let Some(_) = lexer.next_if(|t| t.kind == TokenKind::OpenParen) {
                         let mut args = Vec::new();
                         if let Some(_) = lexer.next_if(|t| t.kind == TokenKind::OpenParen) {
-                            return Expr::Fun(name.text, args);
+                            return Ok(Expr::Fun(name.text, args));
                         }
 
-                        args.push(Self::parse_peekable(lexer));
+                        args.push(Self::parse_peekable(lexer)?);
                         while let Some(_) = lexer.next_if(|t| t.kind == TokenKind::Comma) {
-                            args.push(Self::parse_peekable(lexer));
+                            args.push(Self::parse_peekable(lexer)?);
                         }
-                        if lexer.next_if(|t| t.kind == TokenKind::CloseParen).is_none() {
-                            todo!("EOL: expected close parentheses.");
+                        if let Some(t) = lexer.peek() {
+                            if t.kind == TokenKind::CloseParen {
+                                Ok(Expr::Fun(name.text, args))
+                            } else {
+                                Err(Error::UnexpectedToken(TokenKind::CloseParen, t.kind))
+                            }
+                        } else {
+                            Err(Error::UnexpectedEOF(TokenKind::CloseParen))
                         }
-                        Expr::Fun(name.text, args)
                     } else {
-                        Expr::Sym(name.text)
+                        Ok(Expr::Sym(name.text))
                     }
                 },
-                _ => todo!("report that a symbol was expected.")
+                _ => Err(Error::UnexpectedToken(TokenKind::Sym, name.kind))
             }
         } else {
-            todo!("report EOF error.")
+            Err(Error::UnexpectedEOF(TokenKind::Sym))
         }
     }
-    fn parse(lexer: impl Iterator<Item=Token>) -> Self {
+
+    fn parse(lexer: &mut impl Iterator<Item=Token>) -> Result<Self, Error> {
         Self::parse_peekable(&mut lexer.peekable())
     }
 
@@ -58,6 +64,11 @@ impl fmt::Display for Expr {
             },
         }
     }
+}
+
+enum Error {
+    UnexpectedToken(TokenKind, TokenKind),
+    UnexpectedEOF(TokenKind),
 }
 
 #[derive(Debug)]
@@ -206,13 +217,26 @@ mod tests {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum TokenKind {
     Sym,
     OpenParen,
     CloseParen,
     Comma,
     Equals,
+}
+
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use TokenKind::*;
+        match self {
+            Sym => write!(f, "symbol"),
+            OpenParen => write!(f, "'('"),
+            CloseParen => write!(f, "')'"),
+            Comma => write!(f, "','"),
+            Equals => write!(f, "'='"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -275,14 +299,18 @@ fn main() {
     loop {
         command.clear();
         print!("nox #> ");
-        _ = stdout().flush();
-        _ = stdin().read_line(&mut command);
+        stdout().flush().unwrap();
+        stdin().read_line(&mut command).unwrap();
 
         if command == "quit\n" || command == "q\n" {
             break;
         }
 
-        println!("{}", swap.apply_all(&Expr::parse(Lexer::from_iter(command.chars()))));
+        match Expr::parse(&mut Lexer::from_iter(command.chars())) {
+            Ok(expr) => println!("{}", swap.apply_all(&expr)),
+            Err(Error::UnexpectedToken(expected, actual)) => println!("ERROR: expected {} but got {}.", expected, actual),
+            Err(Error::UnexpectedEOF(expected)) => println!("ERROR: expected {} but encountered EOF.", expected),
+        }
     }
 
 }
