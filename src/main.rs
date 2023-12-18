@@ -28,7 +28,7 @@ impl Expr {
                             if t.kind == TokenKind::CloseParen {
                                 Ok(Expr::Fun(name.text, args))
                             } else {
-                                Err(Error::UnexpectedToken(TokenKind::CloseParen, t.kind))
+                                Err(Error::UnexpectedToken(TokenKind::CloseParen, t.clone()))
                             }
                         } else {
                             Err(Error::UnexpectedEOF(TokenKind::CloseParen))
@@ -37,7 +37,7 @@ impl Expr {
                         Ok(Expr::Sym(name.text))
                     }
                 },
-                _ => Err(Error::UnexpectedToken(TokenKind::Sym, name.kind))
+                _ => Err(Error::UnexpectedToken(TokenKind::Sym, name))
             }
         } else {
             Err(Error::UnexpectedEOF(TokenKind::Sym))
@@ -67,7 +67,7 @@ impl fmt::Display for Expr {
 }
 
 enum Error {
-    UnexpectedToken(TokenKind, TokenKind),
+    UnexpectedToken(TokenKind, Token),
     UnexpectedEOF(TokenKind),
 }
 
@@ -224,6 +224,7 @@ enum TokenKind {
     CloseParen,
     Comma,
     Equals,
+    Invalid,
 }
 
 impl fmt::Display for TokenKind {
@@ -235,29 +236,33 @@ impl fmt::Display for TokenKind {
             CloseParen => write!(f, "')'"),
             Comma => write!(f, "','"),
             Equals => write!(f, "'='"),
+            Invalid => write!(f, "invalid token"),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Token {
     kind: TokenKind,
     text: String,
 }
 
 struct Lexer<Chars: Iterator<Item=char>> {
-    chars: Peekable<Chars>
+    chars: Peekable<Chars>,
+    invalid: bool,
 }
 
 impl<Chars: Iterator<Item=char>> Lexer<Chars> {
     fn from_iter(chars: Chars) -> Self {
-        Self { chars: chars.peekable() }
+        Self {chars: chars.peekable(), invalid: false}
     }
 }
 
 impl<Chars: Iterator<Item=char>> Iterator for Lexer<Chars> {
     type Item = Token;
     fn next(&mut self) -> Option<Token> {
+        if self.invalid { return None }
+
         while let Some(_) = self.chars.next_if(|x| x.is_whitespace()) {}
 
         if let Some(x) = self.chars.next() {
@@ -270,13 +275,13 @@ impl<Chars: Iterator<Item=char>> Iterator for Lexer<Chars> {
                 '=' => Some(Token {kind: TokenKind::Equals, text}),
                 _ => {
                     if !x.is_alphanumeric() {
-                        todo!("report unexpected token properly. starts with '{}'", x);
+                        self.invalid = true;
+                        return Some(Token{kind: TokenKind::Invalid, text});
+                    } else {
+                        while let Some(x) = self.chars.next_if(|x| x.is_alphanumeric()) {
+                            text.push(x)
+                        }
                     }
-
-                    while let Some(x) = self.chars.next_if(|x| x.is_alphanumeric()) {
-                        text.push(x)
-                    }
-
                     Some(Token{kind: TokenKind::Sym, text})
                 }
             }
@@ -308,7 +313,7 @@ fn main() {
 
         match Expr::parse(&mut Lexer::from_iter(command.chars())) {
             Ok(expr) => println!("{}", swap.apply_all(&expr)),
-            Err(Error::UnexpectedToken(expected, actual)) => println!("ERROR: expected {} but got {}.", expected, actual),
+            Err(Error::UnexpectedToken(expected, actual)) => println!("ERROR: expected {} but got {} '{}'.", expected, actual.kind, actual.text),
             Err(Error::UnexpectedEOF(expected)) => println!("ERROR: expected {} but encountered EOF.", expected),
         }
     }
