@@ -5,7 +5,7 @@ a simple expression transformer, not inspired by coq.
 ### quickstart
 
 ```console
-$ cargo run
+$ cargo test
 ```
 
 ### main idea
