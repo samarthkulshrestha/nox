@@ -1,4 +1,6 @@
+use std::io;
 use std::fmt;
+use std::fs;
 use std::iter::Peekable;
 use std::io::{stdin, stdout, Write};
 use std::collections::HashMap;
@@ -29,6 +31,7 @@ impl Expr {
                         }
                         if let Some(t) = lexer.peek() {
                             if t.kind == TokenKind::CloseParen {
+                                lexer.next();
                                 Ok(Expr::Fun(name.text, args))
                             } else {
                                 Err(Error::UnexpectedToken(TokenKind::CloseParen, t.clone()))
@@ -69,9 +72,21 @@ impl fmt::Display for Expr {
     }
 }
 
+#[derive(Debug)]
 enum Error {
     UnexpectedToken(TokenKind, Token),
     UnexpectedEOF(TokenKind),
+    IoError(io::Error),
+}
+
+fn expect_token_kind(lexer: &mut Peekable<impl Iterator<Item=Token>>,
+                     kind: TokenKind) -> Result<Token, Error> {
+    let token = lexer.next().ok_or(Error::UnexpectedEOF(kind))?;
+    if token.kind == kind {
+        Ok(token)
+    } else {
+        Err(Error::UnexpectedToken(kind, token))
+    }
 }
 
 #[derive(Debug)]
@@ -81,6 +96,13 @@ struct Rule {
 }
 
 impl Rule {
+    fn parse(lexer: &mut Peekable<impl Iterator<Item=Token>>) -> Result<Rule, Error> {
+        let head = Expr::parse_peekable(lexer)?;
+        expect_token_kind(lexer, TokenKind::Equals)?;
+        let body = Expr::parse_peekable(lexer)?;
+        Ok(Rule{head, body})
+    }
+
     fn apply_all(&self, expr: &Expr) -> Expr {
         if let Some(bindings) = pattern_match(&self.head, expr) {
             substitute_bindings(&bindings, &self.body)
@@ -220,7 +242,39 @@ mod tests {
     }
 }
 
+fn parse_rules_from_file(file_path: &str) -> Result<HashMap<String, Rule>, Error> {
+    let mut rules = HashMap::new();
+    let source = fs::read_to_string(file_path).map_err(|e| Error::IoError(e))?;
+    let mut lexer = Lexer::from_iter(source.chars()).peekable();
+
+    while let Some(_) = lexer.peek() {
+        let name = expect_token_kind(&mut lexer, TokenKind::Sym)?;
+        expect_token_kind(&mut lexer, TokenKind::Colon)?;
+        let rule = Rule::parse(&mut lexer)?;
+        rules.insert(name.text, rule);
+    }
+    Ok(rules)
+}
+
 fn main() {
+    println!("");
+
+    let default_rules_path = "rules.nox";
+    let rules = match parse_rules_from_file(default_rules_path) {
+        Ok(rules) => {
+            println!("INFO: successfully loaded ruled from {}.\n", default_rules_path);
+            rules
+        }
+        Err(err) => {
+            eprintln!("ERROR: could not read file {}: {:?}", default_rules_path, err);
+            Default::default()
+        }
+    };
+
+    println!("available rules: ");
+    for (name, rule) in rules {
+        println!("{}: {}", name, rule);
+    }
     println!("");
 
     let swap = Rule {
@@ -245,11 +299,14 @@ fn main() {
             Ok(expr) => println!("{}", swap.apply_all(&expr)),
             Err(Error::UnexpectedToken(expected, actual)) => {
                 println!("{:>width$}^", "", width=prompt.len() + actual.loc.col);
-                println!("ERROR: expected {} but got {} '{}'.", expected, actual.kind, actual.text)
+                println!("ERROR: expected {} but got {} '{}'.", expected, actual.kind, actual.text);
             }
             Err(Error::UnexpectedEOF(expected)) => {
                 println!("{:>width$}^", "", width=prompt.len() + command.len());
-                println!("ERROR: expected {} but encountered EOF.", expected)
+                println!("ERROR: expected {} but encountered EOF.", expected);
+            }
+            Err(Error::IoError(io_error)) => {
+                unreachable!("IO ERROR: {}", io_error);
             }
         }
 
