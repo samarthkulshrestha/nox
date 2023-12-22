@@ -13,41 +13,36 @@ enum Expr {
 }
 
 impl Expr {
-    fn parse_peekable(lexer: &mut Peekable<impl Iterator<Item=Token>>) -> Result<Self, Error> {
+    fn parse(lexer: &mut Peekable<impl Iterator<Item=Token>>) -> Result<Self, Error> {
         use TokenKind::*;
         let name = lexer.next().expect("completely exhausted lexer.");
 
-            match name.kind {
-                Sym => {
-                    if let Some(_) = lexer.next_if(|t| t.kind == OpenParen) {
-                        let mut args = Vec::new();
-                        if let Some(_) = lexer.next_if(|t| t.kind == CloseParen) {
-                            return Ok(Expr::Fun(name.text, args));
-                        }
-
-                        args.push(Self::parse_peekable(lexer)?);
-                        while let Some(_) = lexer.next_if(|t| t.kind == Comma) {
-                            args.push(Self::parse_peekable(lexer)?);
-                        }
-
-                        let close_paren = lexer.next().expect("completely exhausted lexer.");
-                        if close_paren.kind == CloseParen {
-                            Ok(Expr::Fun(name.text, args))
-                        } else {
-                            Err(Error::UnexpectedToken(TokenKindSet::single(CloseParen), close_paren))
-                        }
-                    } else {
-                        Ok(Expr::Sym(name.text))
+        match name.kind {
+            Sym => {
+                if let Some(_) = lexer.next_if(|t| t.kind == OpenParen) {
+                    let mut args = Vec::new();
+                    if let Some(_) = lexer.next_if(|t| t.kind == CloseParen) {
+                        return Ok(Expr::Fun(name.text, args));
                     }
-                },
-                _ => Err(Error::UnexpectedToken(TokenKindSet::single(Sym), name))
-            }
-    }
 
-    fn parse(lexer: &mut impl Iterator<Item=Token>) -> Result<Self, Error> {
-        Self::parse_peekable(&mut lexer.peekable())
-    }
+                    args.push(Self::parse(lexer)?);
+                    while let Some(_) = lexer.next_if(|t| t.kind == Comma) {
+                        args.push(Self::parse(lexer)?);
+                    }
 
+                    let close_paren = lexer.next().expect("completely exhausted lexer.");
+                    if close_paren.kind == CloseParen {
+                        Ok(Expr::Fun(name.text, args))
+                    } else {
+                        Err(Error::UnexpectedToken(TokenKindSet::single(CloseParen), close_paren))
+                    }
+                } else {
+                    Ok(Expr::Sym(name.text))
+                }
+            },
+            _ => Err(Error::UnexpectedToken(TokenKindSet::single(Sym), name))
+        }
+    }
 }
 
 impl fmt::Display for Expr {
@@ -255,9 +250,9 @@ impl Context {
                     if let Some(existing_rule) = self.rules.get(&name.text) {
                         return Err(Error::RuleAlreadyExists(name.text, name.loc, existing_rule.loc.clone()))
                     }
-                    let head = Expr::parse_peekable(lexer)?;
+                    let head = Expr::parse(lexer)?;
                     expect_token_kind(lexer, TokenKindSet::single(TokenKind::Equals))?;
-                    let body = Expr::parse_peekable(lexer)?;
+                    let body = Expr::parse(lexer)?;
                     let rule = Rule {
                         loc: keyword.loc,
                         head,
@@ -270,7 +265,7 @@ impl Context {
                     if let Some(_) = self.current_expr {
                         return Err(Error::AlreadyShaping)
                     }
-                    let expr = Expr::parse_peekable(lexer)?;
+                    let expr = Expr::parse(lexer)?;
                     println!("shaping: {}", &expr);
                     self.current_expr = Some(expr);
                 },
