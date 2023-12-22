@@ -231,6 +231,7 @@ mod tests {
 struct Context {
     rules: HashMap<String, Rule>,
     current_expr: Option<Expr>,
+    quit: bool,
 }
 
 impl Context {
@@ -240,12 +241,12 @@ impl Context {
                 .set(TokenKind::Rule)
                 .set(TokenKind::Shape)
                 .set(TokenKind::Apply)
-                .set(TokenKind::Done);
+                .set(TokenKind::Done)
+                .set(TokenKind::Quit);
 
             let keyword = expect_token_kind(lexer, expected_tokens)?;
 
             // TODO: ability to undo rule application
-            // TODO: quitting with a keyword
 
             match keyword.kind {
                 TokenKind::Rule => {
@@ -313,6 +314,9 @@ impl Context {
                         return Err(Error::NoShapingInPlace(keyword.loc))
                     }
                 }
+                TokenKind::Quit => {
+                    self.quit = true;
+                }
                 _ => unreachable!("expected {} but got {}.", expected_tokens, keyword.kind),
             }
             Ok(())
@@ -340,7 +344,7 @@ fn main() {
             lexer.set_file_path(&file_path);
             lexer.peekable()
         };
-        while lexer.peek().expect("completely exhausted lexer.").kind != TokenKind::End {
+        while !context.quit && lexer.peek().expect("completely exhausted lexer.").kind != TokenKind::End {
             if let Err(err) = context.process_command(&mut lexer) {
                 match err {
                     Error::UnexpectedToken(expected_kinds, actual_token) => {
@@ -370,7 +374,7 @@ fn main() {
         let mut prompt: &str;
         let mut command = String::new();
 
-        loop {
+        while !context.quit {
             command.clear();
 
             if let Some(_) = &context.current_expr {
@@ -383,7 +387,7 @@ fn main() {
             stdout().flush().unwrap();
             stdin().read_line(&mut command).unwrap();
 
-            if command == "quit\n" || command == "q\n" {
+            if command == "q\n" {
                 break;
             }
 

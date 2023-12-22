@@ -36,6 +36,7 @@ token_kind_enum! {
     Shape,
     Apply,
     Done,
+    Quit,
 
     // special chars
     OpenParen,
@@ -100,6 +101,7 @@ fn keyword_by_name(text: &str) -> Option<TokenKind> {
         "shape" => Some(TokenKind::Shape),
         "apply" => Some(TokenKind::Apply),
         "done" => Some(TokenKind::Done),
+        "quit" => Some(TokenKind::Quit),
         _ => None,
     }
 }
@@ -113,6 +115,7 @@ impl fmt::Display for TokenKind {
             Shape => write!(f, "`shape`"),
             Apply => write!(f, "`apply`"),
             Done => write!(f, "`done`"),
+            Quit => write!(f, "`quit`"),
             OpenParen => write!(f, "open parenthesis"),
             CloseParen => write!(f, "closed parenthesis"),
             Comma => write!(f, "comma"),
