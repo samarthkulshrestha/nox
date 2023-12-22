@@ -118,11 +118,11 @@ impl fmt::Display for TokenKind {
             Shape => write!(f, "`shape`"),
             Apply => write!(f, "`apply`"),
             Done => write!(f, "`done`"),
-            OpenParen => write!(f, "'('"),
-            CloseParen => write!(f, "')'"),
-            Comma => write!(f, "','"),
-            Equals => write!(f, "'='"),
-            Colon => write!(f, "':'"),
+            OpenParen => write!(f, "open parenthesis"),
+            CloseParen => write!(f, "closed parenthesis"),
+            Comma => write!(f, "comma"),
+            Equals => write!(f, "equals"),
+            Colon => write!(f, "colon"),
             Invalid => write!(f, "invalid token"),
             End => write!(f, "end of input"),
         }
@@ -159,8 +159,8 @@ impl<Chars: Iterator<Item=char>> Lexer<Chars> {
     fn loc(&self) -> Loc {
         Loc {
             file_path: self.file_path.clone(),
-            row: self.lnum,
-            col: self.cnum - self.bol,
+            row: self.lnum + 1,
+            col: self.cnum - self.bol + 1,
         }
     }
 
@@ -172,6 +172,7 @@ impl<Chars: Iterator<Item=char>> Lexer<Chars> {
 impl<Chars: Iterator<Item=char>> Iterator for Lexer<Chars> {
     type Item = Token;
     fn next(&mut self) -> Option<Token> {
+        // TODO: make lexer handle comments
         if self.exhausted { return None }
 
         while let Some(x) = self.chars.next_if(|x| x.is_whitespace()) {
