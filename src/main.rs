@@ -365,12 +365,20 @@ fn main() {
             }
         }
     } else {
-        let prompt = "nox {$} ";
+        let default_prompt = "nox {D}} ";
+        let shaping_prompt = "nox {S}} ";
+        let mut prompt: &str;
         let mut command = String::new();
 
         loop {
             command.clear();
-            // TODO: visual prompt distinction when in shaping mode
+
+            if let Some(_) = &context.current_expr {
+                prompt = shaping_prompt;
+            } else {
+                prompt = default_prompt;
+            }
+
             print!("{}", prompt);
             stdout().flush().unwrap();
             stdin().read_line(&mut command).unwrap();
