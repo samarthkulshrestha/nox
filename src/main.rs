@@ -16,12 +16,13 @@ enum Expr {
 
 impl Expr {
     fn parse_peekable(lexer: &mut Peekable<impl Iterator<Item=Token>>) -> Result<Self, Error> {
-        if let Some(name) = lexer.next() {
+        let name = lexer.next().expect("completely exhausted lexer.");
+
             match name.kind {
                 TokenKind::Sym => {
                     if let Some(_) = lexer.next_if(|t| t.kind == TokenKind::OpenParen) {
                         let mut args = Vec::new();
-                        if let Some(_) = lexer.next_if(|t| t.kind == TokenKind::OpenParen) {
+                        if let Some(_) = lexer.next_if(|t| t.kind == TokenKind::CloseParen) {
                             return Ok(Expr::Fun(name.text, args));
                         }
 
@@ -29,15 +30,12 @@ impl Expr {
                         while let Some(_) = lexer.next_if(|t| t.kind == TokenKind::Comma) {
                             args.push(Self::parse_peekable(lexer)?);
                         }
-                        if let Some(t) = lexer.peek() {
-                            if t.kind == TokenKind::CloseParen {
-                                lexer.next();
-                                Ok(Expr::Fun(name.text, args))
-                            } else {
-                                Err(Error::UnexpectedToken(TokenKind::CloseParen, t.clone()))
-                            }
+
+                        let close_paren = lexer.next().expect("completely exhausted lexer.");
+                        if close_paren.kind == TokenKind::CloseParen {
+                            Ok(Expr::Fun(name.text, args))
                         } else {
-                            Err(Error::UnexpectedEOF(TokenKind::CloseParen))
+                            Err(Error::UnexpectedToken(TokenKind::CloseParen, close_paren))
                         }
                     } else {
                         Ok(Expr::Sym(name.text))
@@ -45,9 +43,6 @@ impl Expr {
                 },
                 _ => Err(Error::UnexpectedToken(TokenKind::Sym, name))
             }
-        } else {
-            Err(Error::UnexpectedEOF(TokenKind::Sym))
-        }
     }
 
     fn parse(lexer: &mut impl Iterator<Item=Token>) -> Result<Self, Error> {
@@ -75,13 +70,12 @@ impl fmt::Display for Expr {
 #[derive(Debug)]
 enum Error {
     UnexpectedToken(TokenKind, Token),
-    UnexpectedEOF(TokenKind),
     IoError(io::Error),
 }
 
 fn expect_token_kind(lexer: &mut Peekable<impl Iterator<Item=Token>>,
                      kind: TokenKind) -> Result<Token, Error> {
-    let token = lexer.next().ok_or(Error::UnexpectedEOF(kind))?;
+    let token = lexer.next().expect("completely exhausted lexer.");
     if token.kind == kind {
         Ok(token)
     } else {
@@ -251,7 +245,11 @@ fn parse_rules_from_file(file_path: &str) -> Result<HashMap<String, Rule>, Error
         lexer.peekable()
     };
 
-    while let Some(_) = lexer.peek() {
+    while let Some(token) = lexer.peek() {
+        if token.kind == TokenKind::End {
+            break;
+        }
+
         let name = expect_token_kind(&mut lexer, TokenKind::Sym)?;
         expect_token_kind(&mut lexer, TokenKind::Colon)?;
         let rule = Rule::parse(&mut lexer)?;
@@ -276,10 +274,6 @@ fn main() {
         Err(Error::UnexpectedToken(expected, actual)) => {
             eprintln!("{}: ERROR: expected {} but got {} '{}'",
                       actual.loc, expected, actual.kind, actual.text);
-            Default::default()
-        }
-        Err(Error::UnexpectedEOF(expected)) => {
-            eprintln!("ERROR: expected {} but got nothing", expected);
             Default::default()
         }
     };
@@ -314,16 +308,12 @@ fn main() {
                 println!("{:>width$}^", "", width=prompt.len() + actual.loc.col);
                 println!("ERROR: expected {} but got {} '{}'.", expected, actual.kind, actual.text);
             }
-            Err(Error::UnexpectedEOF(expected)) => {
-                println!("{:>width$}^", "", width=prompt.len() + command.len());
-                println!("ERROR: expected {} but encountered EOF.", expected);
-            }
-            Err(Error::IoError(io_error)) => {
-                unreachable!("IO ERROR: {}", io_error);
+            Err(err) => {
+                unreachable!("ERROR: {:?}", err)
             }
         }
-
-        println!("");
     }
+
+    println!("");
 
 }
