@@ -5,7 +5,7 @@ a simple expression transformer, not inspired by coq.
 ### quickstart
 
 ```console
-$ cargo run
+$ cargo run rules.nox
 ```
 
 ### main idea
@@ -15,6 +15,8 @@ the main idea is being able to define transformation rules of symbolic algebraic
 #### transforming the derivative of the square function
 
 *(warning! this is not a working example yet!)*
+
+a working example can be found in [rules.nox](./rules.nox).
 
 ```
 rule square_def    square(x) = x^2;
