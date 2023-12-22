@@ -1,7 +1,11 @@
+# Adding two Peano numbers
+
 rule add0 add(0, a) = a
 rule add add(s(a), b) = s(add(a, b))
 
 shape add(s(s(0)), s(s(s(0))))
+  # TODO: it would be nice to have a "strategy" that applies a particular rule
+  # until it applies
   apply add
   apply add
   apply add0
