@@ -250,8 +250,8 @@ fn parse_rules_from_file(file_path: &str) -> Result<HashMap<String, Rule>, Error
             break;
         }
 
+        expect_token_kind(&mut lexer, TokenKind::Rule)?;
         let name = expect_token_kind(&mut lexer, TokenKind::Sym)?;
-        expect_token_kind(&mut lexer, TokenKind::Colon)?;
         let rule = Rule::parse(&mut lexer)?;
         rules.insert(name.text, rule);
     }
@@ -280,7 +280,7 @@ fn main() {
 
     println!("available rules: ");
     for (name, rule) in rules {
-        println!("{}: {}", name, rule);
+        println!("rule {} {}", name, rule);
     }
     println!("");
 
